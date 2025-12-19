@@ -58,25 +58,27 @@
         }
         
         /* Transparent container */
-        .container {
-            max-width: 400px;
-            width: 90%;
-            padding: 30px;
-            background-color: white /* More transparent */
-            border-radius: 10px;
-            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.25);
-            backdrop-filter: blur(3px); /* Minimal blur */
-            border: 1px solid rgba(255, 255, 255, 0.4);
-            position: relative;
-            z-index: 2;
-        }
-        
-        @media (max-width: 480px) {
-            .container {
-                padding: 20px;
-                margin: 20px;
-                background-color: rgba(255, 255, 255, 0.75); /* Slightly more opaque on mobile */
-            }
+        .container es to the form container */
+	.container {
+		max-width: 400px;
+		padding: 16px;
+		background-color: white;
+		border-radius: 5px;
+		position: absolute;
+		left: 50%;
+		top: 50%;
+		transform: translate(-50%, -50%);
+		z-index: 2;
+	}
+
+	@media (max-width: 480px) {
+		.container {
+			left: 10%;
+			top: 20%;
+			margin-left: 5%;
+			transform: translate(-10%, -10%);
+		}
+	}
             
             .iframe-background {
                 opacity: 0.95; /* Even more visible on mobile */
