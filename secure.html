@@ -3,82 +3,25 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title></title>
-  <style>
-    body {
-      font-family: system-ui, sans-serif;
-      max-width: 520px;
-      margin: 2rem auto;
-      padding: 0 1rem;
-      line-height: 1.6;
-    }
-    .success { color: #2e7d32; }
-    .error   { color: #c62828; }
-  </style>
+  <title>Redirecting…</title>
 </head>
 <body>
-  <p>Redirecting…</p>
+  Redirecting…
 
   <script>
-    // ── Configurable part ────────────────────────────────────────
-    const CONFIG = {
-      redirectBase: "web", // ← CHANGE THIS to your real URL, e.g. "https://app.example.com/welcome"
-      param1Name: "ref",
-      param1Value: "summer2025",
-      param2Name: "source",
-      param2Value: "email-link",
-      companyParam: "company",
-      companyValue: "Your Company Ltd",
-      emailParam: "md",
-      useStrongerHash: false,
-    };
+    // same CONFIG + getEmailHash as above
 
-    function getEmailHash(email) {
-      if (CONFIG.useStrongerHash) {
-        return btoa(email + "-salt"); // still basic obfuscation
-      }
-      return btoa(email);
-    }
+    const fragment = window.location.hash.substring(1);
+    const email = fragment ? decodeURIComponent(fragment.trim()) : "";
 
-    // ── Main logic ───────────────────────────────────────────────
-    let fragment = window.location.hash.substring(1);
-    if (fragment) {
-      fragment = decodeURIComponent(fragment.trim());
-    }
-
-    const isValidEmail = fragment && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(fragment);
-
-    if (isValidEmail) {
-      const email = fragment;
-
+    if (email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       const params = new URLSearchParams();
-      params.append(CONFIG.param1Name,   CONFIG.param1Value);
-      params.append(CONFIG.param2Name,   CONFIG.param2Value);
-      params.append(CONFIG.companyParam, CONFIG.companyValue);
-      params.append(CONFIG.emailParam,   getEmailHash(email));
+      params.append("ref",    "summer2025");
+      params.append("source", "email-link");
+      params.append("company", "Your Company Ltd");
+      params.append("md",     btoa(email));
 
-      const redirectURL = `${CONFIG.redirectBase}?${params.toString()}`;
-
-      // Optional: show something briefly (can be removed completely)
-      document.body.innerHTML += `
-        <p class="success">Valid email detected → redirecting…</p>
-        <small>${redirectURL}</small>
-      `;
-
-      // Auto-redirect (1.2s delay – remove setTimeout wrapper for instant redirect)
-      setTimeout(() => {
-        window.location.replace(redirectURL);
-      }, 1200);
-    } 
-    else if (fragment) {
-      document.body.innerHTML += `
-        <p class="error">Invalid email format in URL fragment:</p>
-        <code>${fragment}</code>
-      `;
-    } 
-    else {
-      // Removed the "No email found..." message completely
-      // Page remains almost empty until redirect or error occurs
+      window.location.replace(`web?${params}`);
     }
   </script>
 </body>
