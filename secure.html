@@ -3,134 +3,109 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Email Extractor + Redirect</title>
+  <title>Email → Redirect</title>
   <style>
-    body {
-      font-family: system-ui, sans-serif;
-      max-width: 520px;
-      margin: 2rem auto;
-      padding: 0 1rem;
-      line-height: 1.6;
-    }
-    #output {
-      margin: 1.5rem 0;
-      padding: 1rem;
-      border: 1px solid #ddd;
-      border-radius: 8px;
-      background: #f9f9f9;
-      word-break: break-all;
-    }
+    body { font-family: system-ui, sans-serif; max-width: 540px; margin: 2rem auto; padding: 0 1rem; line-height: 1.6; }
+    #output { margin: 1.5rem 0; padding: 1rem; border: 1px solid #ddd; border-radius: 8px; background: #f9f9f9; word-break: break-all; }
     .success { color: #2e7d32; }
     .error   { color: #c62828; }
-    button {
-      padding: 0.6rem 1.2rem;
-      margin: 0.5rem 0.3rem 0 0;
-      border: none;
-      border-radius: 6px;
-      cursor: pointer;
-    }
-    #redirect-btn { background: #1976d2; color: white; }
+    button   { padding: 0.7rem 1.4rem; margin: 0.4rem 0.6rem 0 0; border: none; border-radius: 6px; cursor: pointer; font-size: 1rem; }
+    #copy-email    { background: #424242; color: white; }
+    #redirect-btn  { background: #1976d2; color: white; }
     #redirect-btn:hover { background: #1565c0; }
+    code { background:#e0e0e0; padding: 3px 7px; border-radius: 5px; }
   </style>
 </head>
 <body>
   <h1>Email → Redirect Builder</h1>
-  <p>Extracts email from #fragment and prepares redirect URL</p>
+  <p>Paste or use URL like: <code>...?alice@company.com</code></p>
 
-  <div id="output">Waiting...</div>
+  <div id="output">Waiting for email in URL fragment…</div>
 
   <button id="copy-email" disabled>Copy email</button>
-  <button id="redirect-btn" disabled>Go to redirect URL</button>
+  <button id="redirect-btn" disabled>Go to destination</button>
 
   <script>
-    // ── Helper: very simple email obfuscation (base64 example)
-    // Replace with your real encodeEmail logic if different
-    function encodeEmail(email) {
-      if (!email) return "";
-      try {
-        return btoa(email);           // base64 – very common simple obfuscation
-        // Alternatives: encodeURIComponent(email.replace(/@/g, "[at]")) etc.
-      } catch (e) {
-        return "";
+    // ── Configurable part ────────────────────────────────────────
+    const CONFIG = {
+      redirectBase:   "https://app.your-real-domain.com/welcome", // ← CHANGE THIS
+      param1Name:     "ref",         // was "num"
+      param1Value:    "summer2025",  // ← your real value / logic
+      param2Name:     "source",      // was "x"
+      param2Value:    "email-link",  // ← your real value
+      companyParam:   "company",
+      companyValue:   "Your Company Ltd", // can be dynamic
+      emailParam:     "md",
+      useStrongerHash: false,        // set true if you want something better than base64
+    };
+
+    function getEmailHash(email) {
+      if (CONFIG.useStrongerHash) {
+        // Simple example – replace with real hash if needed (crypto.subtle is async)
+        return btoa(email + "-salt"); // still not secure, just slightly better
       }
+      return btoa(email); // original simple version
     }
 
-    const output      = document.getElementById('output');
-    const copyBtn     = document.getElementById('copy-email');
+    // ── Main logic ───────────────────────────────────────────────
+    const output     = document.getElementById('output');
+    const copyBtn    = document.getElementById('copy-email');
     const redirectBtn = document.getElementById('redirect-btn');
 
     let email = "";
     let domain = "";
     let redirectURL = "";
 
-    // 1. Get email from URL hash
+    // Get fragment
     let fragment = window.location.hash.substring(1);
     if (fragment) {
       fragment = decodeURIComponent(fragment.trim());
     }
 
-    // 2. Basic email validation
-    const isValid = fragment && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(fragment);
+    const isValidEmail = fragment && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(fragment);
 
-    if (isValid) {
+    if (isValidEmail) {
       email = fragment;
+      domain = email.split('@')[1] || '';
 
-      // 3. Extract domain (your requested logic)
-      const atIndex = email.indexOf("@");
-      if (atIndex !== -1) {
-        domain = email.substring(atIndex + 1);
-      }
+      const params = new URLSearchParams();
+      params.append(CONFIG.param1Name,  CONFIG.param1Value);
+      params.append(CONFIG.param2Name,  CONFIG.param2Value);
+      params.append(CONFIG.companyParam, CONFIG.companyValue);
+      params.append(CONFIG.emailParam,  getEmailHash(email));
 
-      // ── Your new variables ───────────────────────────────────────
-      // → Replace these placeholders with real values/logic
-      const num         = "12345";                    // ← define / get from somewhere
-      const num1        = "abc999";                   // ← define / get from somewhere
-      const companyName = "Acme Corp";                // ← define / get from somewhere
+      redirectURL = `${CONFIG.redirectBase}?${params.toString()}`;
 
-      const encodedMd   = encodeEmail(email);        // your &md= parameter
-
-      // 4. Build redirect URL (your requested line – modernized)
-      redirectURL =
-        "web.html?" +
-        num +
-        "&x=" + num1 +
-        "&company=" + encodeURIComponent(companyName) +
-        "&md=" + encodedMd;
-
-      // Show result
       output.innerHTML = `
         <strong class="success">Valid email:</strong> ${email}<br>
-        <strong>Domain:</strong> ${domain || "—"}<br><br>
-        <strong>Redirect URL ready:</strong><br>
-        <code style="background:#eee;padding:2px 6px;border-radius:4px;word-break:break-all;">
-          ${redirectURL}
-        </code>
+        <strong>Domain:</strong> ${domain || '—'}<br><br>
+        <strong>Redirect URL:</strong><br>
+        <code>${redirectURL}</code>
       `;
 
       copyBtn.disabled = false;
       redirectBtn.disabled = false;
     }
     else if (fragment) {
-      output.innerHTML = `<strong class="error">Invalid email format:</strong><br>${fragment}`;
+      output.innerHTML = `<strong class="error">Invalid email:</strong><br><code>${fragment}</code>`;
     }
     else {
-      output.textContent = "No #email@domain.com found in the URL.";
+      output.textContent = "No email found in URL (use #your@email.com)";
     }
 
-    // Copy email
-    copyBtn.addEventListener('click', () => {
+    // Copy button
+    copyBtn.addEventListener('click', async () => {
       if (!email) return;
-      navigator.clipboard.writeText(email).then(() => {
+      try {
+        await navigator.clipboard.writeText(email);
         copyBtn.textContent = "Copied!";
         setTimeout(() => copyBtn.textContent = "Copy email", 1800);
-      });
+      } catch {}
     });
 
     // Redirect button
     redirectBtn.addEventListener('click', () => {
-      if (redirectURL) {
-        window.location.href = redirectURL;
-      }
+      if (redirectURL) window.location.href = redirectURL;
     });
   </script>
 </body>
